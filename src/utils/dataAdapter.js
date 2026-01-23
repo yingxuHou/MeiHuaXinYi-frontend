@@ -258,7 +258,7 @@ export function adaptDivinationStats(apiData) {
  * @returns {Object} API期望的参数格式
  */
 export function adaptDivinationParams(formData) {
-  const { question, method, category, ...otherParams } = formData
+  const { question, method, category, sourceId, ...otherParams } = formData
 
   let params = {}
 
@@ -295,7 +295,8 @@ export function adaptDivinationParams(formData) {
   return {
     question,
     method,
-    params
+    params,
+    ...(sourceId ? { sourceId } : {})
   }
 }
 

@@ -19,6 +19,9 @@ import {
 export const useDivinationStore = defineStore('divination', () => {
   // 状态
   const currentQuestion = ref('')
+  const currentSourceId = ref('')
+  const inFlightSourceId = ref('')
+  const sourceIdToResultId = ref({})
   const currentDivination = ref(null)
   const divinationHistory = ref([])
   const isProcessing = ref(false)
@@ -47,6 +50,10 @@ export const useDivinationStore = defineStore('divination', () => {
     currentQuestion.value = question
   }
   
+  const setCurrentSourceId = (sourceId) => {
+    currentSourceId.value = sourceId || ''
+  }
+
   const setProcessing = (processing, step = '', progress = 0) => {
     isProcessing.value = processing
     processingStep.value = step
@@ -62,14 +69,21 @@ export const useDivinationStore = defineStore('divination', () => {
   
   // 开始占卜 - 使用真实API
   const startDivination = async (divinationData) => {
+    const requestSourceId =
+      typeof divinationData === 'object' && divinationData
+        ? divinationData.sourceId || currentSourceId.value
+        : currentSourceId.value
+
     try {
       // 兼容旧版本调用方式
       if (typeof divinationData === 'string') {
-        divinationData = { question: divinationData, method: 'time' }
+        divinationData = { question: divinationData, method: 'time', sourceId: requestSourceId }
       }
 
       setCurrentQuestion(divinationData.question)
+      if (requestSourceId) setCurrentSourceId(requestSourceId)
       setProcessing(true, '正在生成卦象...', 10)
+      inFlightSourceId.value = requestSourceId || ''
 
       // 适配参数格式
       const apiParams = adaptDivinationParams(divinationData)
@@ -87,6 +101,12 @@ export const useDivinationStore = defineStore('divination', () => {
         currentDivination.value = adaptedData
         currentResult.value = adaptedData
         lastResult.value = adaptedData
+        if (requestSourceId) {
+          sourceIdToResultId.value = {
+            ...sourceIdToResultId.value,
+            [requestSourceId]: adaptedData.id
+          }
+        }
 
         // 刷新历史记录
         await loadHistory(1)
@@ -101,6 +121,10 @@ export const useDivinationStore = defineStore('divination', () => {
       console.error('占卜错误:', error)
       const errorMessage = adaptErrorMessage(error)
       throw new Error(errorMessage)
+    } finally {
+      if (inFlightSourceId.value === (requestSourceId || '')) {
+        inFlightSourceId.value = ''
+      }
     }
   }
   
@@ -261,6 +285,8 @@ export const useDivinationStore = defineStore('divination', () => {
     currentDivination.value = null
     currentResult.value = null
     currentQuestion.value = ''
+    currentSourceId.value = ''
+    inFlightSourceId.value = ''
     setProcessing(false)
   }
   
@@ -271,6 +297,7 @@ export const useDivinationStore = defineStore('divination', () => {
     historyPage.value = 1
     historyTotal.value = 0
     lastResult.value = null
+    sourceIdToResultId.value = {}
   }
 
   // 评价占卜结果 - 新增功能
@@ -376,6 +403,9 @@ export const useDivinationStore = defineStore('divination', () => {
   return {
     // 状态
     currentQuestion,
+    currentSourceId,
+    inFlightSourceId,
+    sourceIdToResultId,
     currentDivination,
     divinationHistory,
     isProcessing,
@@ -395,6 +425,7 @@ export const useDivinationStore = defineStore('divination', () => {
     
     // 方法
     setCurrentQuestion,
+    setCurrentSourceId,
     setProcessing,
     updateProcessingProgress,
     startDivination,

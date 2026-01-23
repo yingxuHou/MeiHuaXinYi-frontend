@@ -128,6 +128,7 @@ import { useUserStore } from '@/stores/user'
 import { useDivinationStore } from '@/stores/divination'
 import { useAppStore } from '@/stores/app'
 import { divinationAPI } from '@/api/divination'
+import { generateSourceId } from '@/utils'
 import StarryBackground from '@/components/common/StarryBackground.vue'
 import MysticalCard from '@/components/common/MysticalCard.vue'
 import MysticalButton from '@/components/common/MysticalButton.vue'
@@ -186,11 +187,13 @@ const canSubmit = computed(() => {
   return questionForm.category &&
          questionForm.question &&
          questionForm.question.length >= 5 &&
-         userStore.freeCount > 0
+         userStore.freeCount > 0 &&
+         !divinationStore.isProcessing
 })
 
 const buttonText = computed(() => {
   if (loading.value) return '验证中...'
+  if (divinationStore.isProcessing) return '占卜进行中...'
   if (!questionForm.question) return '请输入您的问题'
   if (questionForm.question.length < 5) return `请输入至少5个字符 (当前${questionForm.question.length}字符)`
   if (!questionForm.category) return '请选择问题分类'
@@ -241,12 +244,14 @@ const handleSubmit = async () => {
 
     // 设置当前问题
     divinationStore.setCurrentQuestion(questionForm.question)
+    const sourceId = generateSourceId()
+    divinationStore.setCurrentSourceId(sourceId)
 
     // 使用免费次数
     userStore.useFreeCount()
 
     // 跳转到占卜加载页面
-    router.push('/divination/loading')
+    router.push({ path: '/divination/loading', query: { sourceId } })
 
   } catch (error) {
     ElMessage.error(error.message || '提交失败，请重试')

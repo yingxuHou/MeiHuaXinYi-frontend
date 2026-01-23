@@ -36,7 +36,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useDivinationStore } from '@/stores/divination'
@@ -46,6 +46,7 @@ import DivinationAnimation from '@/components/divination/DivinationAnimation.vue
 
 // 路由和状态管理
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const divinationStore = useDivinationStore()
 const appStore = useAppStore()
@@ -140,7 +141,7 @@ const handleAnimationComplete = async (hexagramData) => {
     setTimeout(() => {
       const resultId = String(divinationResult.value?.id || divinationResult.value?._id || 'temp_' + Date.now())
       console.log('🎯 准备跳转到结果页面:', resultId)
-      router.push(`/divination/result/${resultId}`)
+      router.replace(`/divination/result/${resultId}`)
     }, 1000)
   } catch (error) {
     console.error('❌ 跳转失败:', error)
@@ -162,7 +163,25 @@ const startDivination = async () => {
     console.log('🎯 开始获取占卜结果...')
     
     // 调用占卜API获取结果
-    const result = await divinationStore.startDivination(divinationStore.currentQuestion)
+    const querySourceId = Array.isArray(route.query.sourceId) ? route.query.sourceId[0] : route.query.sourceId
+    const sourceId = querySourceId || divinationStore.currentSourceId
+    if (sourceId) {
+      const existingResultId = divinationStore.sourceIdToResultId?.[sourceId]
+      if (existingResultId) {
+        router.replace(`/divination/result/${existingResultId}`)
+        return
+      }
+      if (divinationStore.isProcessing && divinationStore.inFlightSourceId === sourceId) {
+        return
+      }
+      divinationStore.setCurrentSourceId(sourceId)
+    }
+
+    const result = await divinationStore.startDivination({
+      question: divinationStore.currentQuestion,
+      method: 'time',
+      sourceId: sourceId || undefined
+    })
     
     if (result.success) {
       // 保存占卜结果
